@@ -18,7 +18,7 @@ def test_parseTime_invalid():
 
 #setup code
 @pytest.fixture(autouse=True)
-def tempDate(tmp_path,monkeypatch): # returns eventpath back to normal after
+def tempData(tmp_path,monkeypatch): # returns eventpath back to normal after
     monkeypatch.setattr(main, 'EVENTS_FILE', tmp_path / 'events.json')
     monkeypatch.setattr(main, 'DELETED_FILE', tmp_path / 'deleted_events.json')
     monkeypatch.setattr(main, 'events', {})
@@ -32,12 +32,12 @@ def test_addEvent_storesEvent():
     assert main.events[1]['type'] == 'O'
 
 def test_addEvent_recurring():
-    main.addEvent('Lecture notes to be completed',datetime.date(2026,10,25),'0800',11121,'WEEKLY')
+    main.addEvent('Lecture notes to be completed',datetime.date(2026,10,25),'0800','11121','WEEKLY')
 
     assert main.events[1]['type'] == 'R'
     assert main.events[1]['freq'] == 'WEEKLY'
 
 def test_addEvent_savesToFile():
-    main.addEvent('Lecture notes to be completed',datetime.date(2026,10,28),'1100',11221,'MONTHLY')
+    main.addEvent('Lecture notes to be completed',datetime.date(2026,10,28),'1100','11221','MONTHLY')
 
     assert main.EVENTS_FILE.exists()
