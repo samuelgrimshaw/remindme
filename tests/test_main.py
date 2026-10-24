@@ -37,4 +37,7 @@ def test_addEvent_recurring():
     assert main.events[1]['type'] == 'R'
     assert main.events[1]['freq'] == 'WEEKLY'
 
+def test_addEvent_savesToFile():
+    main.addEvent('Lecture notes to be completed',datetime.date(2026,10,28),'1100',11221,'MONTHLY')
 
+    assert main.EVENTS_FILE.exists()
