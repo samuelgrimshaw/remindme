@@ -2,6 +2,17 @@ import datetime
 import pytest
 import main
 
+
+
+#setup code
+@pytest.fixture(autouse=True)
+def tempData(tmp_path,monkeypatch): # returns eventpath back to normal after
+    monkeypatch.setattr(main, 'EVENTS_FILE', tmp_path / 'events.json')
+    monkeypatch.setattr(main, 'DELETED_FILE', tmp_path / 'deleted_events.json')
+    monkeypatch.setattr(main, 'events', {})
+    monkeypatch.setattr(main, 'pendingDeletes', [])
+    monkeypatch.setattr(main, 'eventNum', 1)
+
 def test_parseDate_valid():
     assert main.parseDate('041126') == datetime.date(2026,11,4)
 
@@ -15,15 +26,6 @@ def test_parseTime_valid():
 def test_parseTime_invalid():
     with pytest.raises(ValueError):
         main.parseTime('2411')
-
-#setup code
-@pytest.fixture(autouse=True)
-def tempData(tmp_path,monkeypatch): # returns eventpath back to normal after
-    monkeypatch.setattr(main, 'EVENTS_FILE', tmp_path / 'events.json')
-    monkeypatch.setattr(main, 'DELETED_FILE', tmp_path / 'deleted_events.json')
-    monkeypatch.setattr(main, 'events', {})
-    monkeypatch.setattr(main, 'pendingDeletes', [])
-    monkeypatch.setattr(main, 'eventNum', 1)
 
 def test_addEvent_storesEvent():
     main.addEvent('Essay due', datetime.date(2026,11,4),'0900','CS101', None)
