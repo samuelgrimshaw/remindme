@@ -1,2 +1,3 @@
 caldav>=3.5
 icalendar>=6.0
+pytest>=9.0
