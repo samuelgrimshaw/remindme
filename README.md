@@ -47,7 +47,7 @@ pip install -r requirements.txt
 
 ### Setting up the calendar
 
-RemindMe syncs into a calendar called **`RemindMeNEW`**. Before your first sync, create it in the Calendar app (or at [icloud.com/calendar](https://www.icloud.com/calendar)) under your iCloud account, using exactly that name.
+RemindMe syncs into a calendar called **`RemindMe`**. Before your first sync, create it in the Calendar app (or at [icloud.com/calendar](https://www.icloud.com/calendar)) under your iCloud account, using exactly that name.
 
 ## Usage
 
