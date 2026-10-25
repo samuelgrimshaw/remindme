@@ -18,10 +18,10 @@ I built this to keep track of university deadlines, lectures and work shifts, wi
 
 ## Requirements
 
-- Python 3.10 or newer (developed on 3.13)
+- Python 3.10 or newer 
 - An iCloud account with an [app-specific password](https://support.apple.com/en-gb/102654)
 
-> **Note:** iCloud won't accept your normal Apple ID password over CalDAV. Generate an app-specific password at [account.apple.com](https://account.apple.com) and use that when syncing.
+> **Note:** You must generate an app-specific password at [account.apple.com](https://account.apple.com) and use that when syncing.
 
 ## Installation
 
@@ -82,15 +82,15 @@ Move event 2 to a new time:
 python main.py edit 2 time 1500
 ```
 
-Sync to iCloud (you'll be asked for your Apple ID email and app-specific password):
+Sync to iCloud (enter your Apple ID email and app-specific password):
 
 ```bash
 python main.py sync
 ```
 
-Run `python main.py --help`, or `python main.py <command> --help`, for every option.
+Run `python main.py --help` for every option.
 
-## How sync works
+## How syncs work
 
 Each event gets a UID the first time it's synced, and that UID is stored in `events.json`. On every sync RemindMe fetches the events already in the `RemindMeNEW` calendar and compares UIDs:
 
@@ -98,9 +98,9 @@ Each event gets a UID the first time it's synced, and that UID is stored in `eve
 - **Already on iCloud and edited locally**: the remote copy is updated in place.
 - **Deleted locally**: the UID was saved to `deleted_events.json` when you deleted it, so the remote copy is removed and the queue is cleared.
 
-Times are in UK time (`Europe/London`), and each event is created as a 30-minute block.
+Times default to a 30 minute block. Functionality to change these blocks will be added soon.
 
-## Running tests
+## How to run tests
 
 The tests use `pytest` and write to a temporary folder, so your real `events.json` is never touched.
 
@@ -109,7 +109,7 @@ pip install pytest
 pytest
 ```
 
-They cover date and time parsing, adding events, and saving events to file.
+They cover date and time parsing, adding events, and saving events to file. More to come soon.
 
 ## Project structure
 
@@ -117,8 +117,8 @@ They cover date and time parsing, adding events, and saving events to file.
 main.py              # the whole app: CLI commands, event handling and iCloud sync
 tests/test_main.py   # pytest tests
 requirements.txt     # dependencies (caldav, icalendar)
-events.json          # saved events (created automatically, git-ignored)
-deleted_events.json  # UIDs waiting to be deleted from iCloud (git-ignored)
+events.json          # saved events (created automatically) (ignored)
+deleted_events.json  # UIDs waiting to be deleted from iCloud (ignored)
 ```
 
 ## Possible improvements
