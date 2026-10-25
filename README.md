@@ -121,8 +121,9 @@ events.json          # saved events (created automatically) (ignored)
 deleted_events.json  # UIDs waiting to be deleted from iCloud (ignored)
 ```
 
-## Possible improvements
+## To do list
 
 - Store credentials in the macOS Keychain instead of asking for them on every sync
 - Two-way sync, so events added on iCloud are pulled back down
 - Let the user choose event length, reminder time and time zone
+- Include more tests
