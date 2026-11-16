@@ -9,6 +9,7 @@ import argparse
 import sys
 from caldav.lib.error import AuthorizationError
 from pathlib import Path
+import keyring
 
 
 
@@ -145,15 +146,24 @@ def editEvent(id,field,value):
     saveEvents()
     print("Event edited.")
 
+def getCredentials():
+    email = input("Email: ")
+    if keyring.get_password('remindme',email):
+        password = keyring.get_password('remindme',email)
+    else:
+        password = getpass("Password: ")
+        keyring.set_password('remindme',email,password)
+    return [email,password]
+
+
 
 def syncEvents():
-    email = input("Email: ")
-    password = getpass("Password: ")
+    credentials = getCredentials()
     try:
         with caldav.DAVClient(
             url="https://caldav.icloud.com/",
-            username=email,
-            password=password
+            username=credentials[0],
+            password=credentials[1]
         ) as client:
             calendars = client.get_calendars()
             calendarName = 'RemindMeNEW'

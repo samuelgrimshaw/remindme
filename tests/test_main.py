@@ -43,3 +43,6 @@ def test_addEvent_savesToFile():
     main.addEvent('Lecture notes to be completed',datetime.date(2026,10,28),'1100','11221','MONTHLY')
 
     assert main.EVENTS_FILE.exists()
+
+def test_deleteEvent_deleteAnEvent():
+    main.deleteEvent()
