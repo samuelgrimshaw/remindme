@@ -17,6 +17,8 @@ DATA_DIR = Path(__file__).parent
 EVENTS_FILE = DATA_DIR / 'events.json'
 DELETED_FILE = DATA_DIR / 'deleted_events.json'
 
+SERVICE_NAME = 'remindme'
+
 
 
 def loadJson(path,default):
@@ -148,12 +150,24 @@ def editEvent(id,field,value):
 
 def getCredentials():
     email = input("Email: ")
-    if keyring.get_password('remindme',email):
-        password = keyring.get_password('remindme',email)
+    if keyring.get_password(SERVICE_NAME,email):
+        password = keyring.get_password(SERVICE_NAME,email)
     else:
         password = getpass("Password: ")
     return (email,password)
 
+
+
+
+
+
+def syncDeletes(deletes,existing):
+    for uid in deletes:
+        if uid in existing:
+            existing[uid].delete()
+            del existing[uid]
+            print('Event deleted')
+    deletes.clear()
 
 
 def syncEvents():
@@ -181,7 +195,7 @@ def syncEvents():
 
 
             # set password
-            keyring.set_password('remindme',email,password)
+            keyring.set_password(SERVICE_NAME,email,password)
 
 
     
@@ -195,12 +209,10 @@ def syncEvents():
 
             # deleted events
 
-            for uid in pendingDeletes:
-                if uid in existing:
-                    existing[uid].delete()
-                    del existing[uid]
-                    print('Event deleted')
-            pendingDeletes.clear()
+            syncDeletes(pendingDeletes,existing)
+
+
+
 
             for id,detail in events.items():
                 title = detail['desc']
@@ -259,7 +271,7 @@ def syncEvents():
                     print("event added")
             saveEvents()
     except AuthorizationError:
-        keyring.delete_password(email,password)
+        keyring.delete_password(SERVICE_NAME,email)
         sys.exit('Login failed, check your email and app-specific password')
         
 
