@@ -169,6 +169,55 @@ def syncDeletes(deletes,existing):
             print('Event deleted')
     deletes.clear()
 
+def syncUpdates(start,title,UID,array):
+    remoteEvent = array[UID]
+    comp = remoteEvent.icalendar_component
+
+    for field in ('summary','dtstart','dtend'):
+        comp.pop(field,None)
+    comp.add('summary', title)
+    comp.add('dtstart',start)
+    comp.add('dtend',start + datetime.timedelta(minutes=30))
+    comp.subcomponents = [c for c in comp.subcomponents if c.name != 'VALARM']
+    comp.add_component(makeAlarm(title))
+    remoteEvent.save()
+    print('Event updated')
+
+def syncCreate(freq,start,title,eventUID,calendar):
+    if freq is None:
+        calendar.add_event(
+            dtstart=start,
+            dtend=start + datetime.timedelta(minutes=30),
+            summary=title,
+            uid=eventUID,
+            alarm_trigger=datetime.timedelta(minutes=-60),
+            alarm_action='DISPLAY',
+            alarm_description=title
+        )
+    else:
+        calendar.add_event(
+            dtstart=start,
+            dtend=start + datetime.timedelta(minutes=30),
+            summary=title,
+            uid=eventUID,
+            rrule={'FREQ': freq},
+            alarm_trigger=datetime.timedelta(minutes=-60),
+            alarm_action='DISPLAY',
+            alarm_description=title
+        )
+def findCalendar(client):
+    calendars = client.get_calendars()
+    calendarName = 'RemindMeNEW'
+
+    matches = [
+        calendar for calendar in calendars
+        if calendar.get_display_name() == calendarName
+    ]
+
+    if not matches:
+        sys.exit('No calendar found, check README to create a calendar.')
+    
+    return matches[0]
 
 def syncEvents():
     email,password = getCredentials()
@@ -177,48 +226,28 @@ def syncEvents():
             url="https://caldav.icloud.com/",
             username=email,
             password=password
-        ) as client:
-            calendars = client.get_calendars()
-            calendarName = 'RemindMeNEW'
-
-            matches = [
-                calendar for calendar in calendars
-                if calendar.get_display_name() == calendarName
-            ]
-
-            if not matches:
-                sys.exit('No calendar found, check README to create a calendar.')
-            
-            calendar = matches[0]
-
+            ) as client:
+            calendar = findCalendar(client)
             currentEvents = calendar.get_events()
-
 
             # set password
             keyring.set_password(SERVICE_NAME,email,password)
 
-
-    
-
-
-
-
+            # create existing array
             existing = {}
             for event in currentEvents:
                 existing[str(event.get_icalendar_component()['UID'])] = event
 
             # deleted events
-
             syncDeletes(pendingDeletes,existing)
-
-
-
 
             for id,detail in events.items():
                 title = detail['desc']
                 startTime = datetime.datetime.strptime(detail['time'], "%H%M").time()
 
                 start = datetime.datetime.combine(detail['date'],startTime,tzinfo=ZoneInfo("Europe/London"))
+
+                freq = detail['freq']
 
 
 
@@ -233,45 +262,18 @@ def syncEvents():
                 if eventUID in existing and needsUpdating == False:
                     print('event already in')
                 elif eventUID in existing and needsUpdating:
-                    remoteEvent = existing[eventUID]
-                    comp = remoteEvent.icalendar_component
-
-                    for field in ('summary','dtstart','dtend'):
-                        comp.pop(field,None)
-                    comp.add('summary', title)
-                    comp.add('dtstart',start)
-                    comp.add('dtend',start + datetime.timedelta(minutes=30))
-                    comp.subcomponents = [c for c in comp.subcomponents if c.name != 'VALARM']
-                    comp.add_component(makeAlarm(title))
-                    remoteEvent.save()
+                    syncUpdates(start,title,eventUID,existing)
                     detail['needsUpdating'] = False
-                    print('Event updated')
                 else:
-                    if detail['freq'] is None:
-                        calendar.add_event(
-                            dtstart=start,
-                            dtend=start + datetime.timedelta(minutes=30),
-                            summary=title,
-                            uid=eventUID,
-                            alarm_trigger=datetime.timedelta(minutes=-60),
-                            alarm_action='DISPLAY',
-                            alarm_description=title
-                        )
-                    else:
-                        calendar.add_event(
-                            dtstart=start,
-                            dtend=start + datetime.timedelta(minutes=30),
-                            summary=title,
-                            uid=eventUID,
-                            rrule={'FREQ': detail['freq']},
-                            alarm_trigger=datetime.timedelta(minutes=-60),
-                            alarm_action='DISPLAY',
-                            alarm_description=title
-                        )
+                    syncCreate(freq,start,title,eventUID,calendar)
+                    detail['needsUpdating'] = False
                     print("event added")
             saveEvents()
     except AuthorizationError:
-        keyring.delete_password(SERVICE_NAME,email)
+        try:
+            keyring.delete_password(SERVICE_NAME, email)
+        except keyring.errors.PasswordDeleteError:
+            pass
         sys.exit('Login failed, check your email and app-specific password')
         
 
@@ -292,7 +294,6 @@ def viewEvent(eventNum):
     print("Date: ", events[eventNum]['date'].strftime("%d %B %Y"))
     print('Time: ',datetime.datetime.strptime(events[eventNum]['time'],'%H%M').strftime('%H:%M'))  
     print("Description: ",events[eventNum]['desc'])
-
     print()
 
 def viewAllEvents():
