@@ -152,18 +152,17 @@ def getCredentials():
         password = keyring.get_password('remindme',email)
     else:
         password = getpass("Password: ")
-        keyring.set_password('remindme',email,password)
-    return [email,password]
+    return (email,password)
 
 
 
 def syncEvents():
-    credentials = getCredentials()
+    email,password = getCredentials()
     try:
         with caldav.DAVClient(
             url="https://caldav.icloud.com/",
-            username=credentials[0],
-            password=credentials[1]
+            username=email,
+            password=password
         ) as client:
             calendars = client.get_calendars()
             calendarName = 'RemindMeNEW'
@@ -179,6 +178,10 @@ def syncEvents():
             calendar = matches[0]
 
             currentEvents = calendar.get_events()
+
+
+            # set password
+            keyring.set_password('remindme',email,password)
 
 
     
@@ -256,7 +259,9 @@ def syncEvents():
                     print("event added")
             saveEvents()
     except AuthorizationError:
+        keyring.delete_password(email,password)
         sys.exit('Login failed, check your email and app-specific password')
+        
 
 def dateArg(text):
     try:
