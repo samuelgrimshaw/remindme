@@ -55,6 +55,11 @@ def makeAlarm(title,minutesBefore=60):
 
 
 
+
+
+
+#EVENTS
+
 def saveEvents():
     eventsToSave = {}
     for eventId, details in events.items():
@@ -69,7 +74,7 @@ def saveEvents():
 
     
 
-def addEvent(desc,date,time,mod,freq):
+def addEvent(desc,date,time,mod,freq,uid=None):
     global eventNum
 
     
@@ -80,7 +85,7 @@ def addEvent(desc,date,time,mod,freq):
         'time':time,
         'mod':mod,
         'desc':desc,
-        'uid': str(uuid.uuid4()),
+        'uid': uid if uid else str(uuid.uuid4()),
         'needsUpdating' : False
     }
     eventNum += 1
@@ -160,6 +165,10 @@ def getCredentials():
 
 
 
+
+
+
+# SYNC
 
 def syncDeletes(deletes,existing):
     for uid in deletes:
@@ -241,6 +250,8 @@ def syncEvents():
             # deleted events
             syncDeletes(pendingDeletes,existing)
 
+            localUIDs = set()
+
             for id,detail in events.items():
                 title = detail['desc']
                 startTime = datetime.datetime.strptime(detail['time'], "%H%M").time()
@@ -259,6 +270,7 @@ def syncEvents():
                     detail['uid'] = str(uuid.uuid4())
                     eventUID = detail.get('uid')
                     saveEvents()
+
                 if eventUID in existing and needsUpdating == False:
                     print('event already in')
                 elif eventUID in existing and needsUpdating:
@@ -268,6 +280,21 @@ def syncEvents():
                     syncCreate(freq,start,title,eventUID,calendar)
                     detail['needsUpdating'] = False
                     print("event added")
+
+
+                localUIDs.add(eventUID)
+            
+            for uid in existing:
+                if uid not in localUIDs:
+                    comp = existing[uid].icalendar_component
+                    title = str(comp.get('summary',''))
+                    start = comp['dtstart'].dt
+                    if isinstance(start, datetime.datetime):
+                        start = start.astimezone(ZoneInfo("Europe/London"))
+                        addEvent(title,start.date(),start.strftime('%H%M'),'',None,uid)
+
+                
+
             saveEvents()
     except AuthorizationError:
         try:
@@ -277,6 +304,11 @@ def syncEvents():
         sys.exit('Login failed, check your email and app-specific password')
         
 
+
+
+
+
+# ARG
 def dateArg(text):
     try:
         return parseDate(text)
@@ -287,6 +319,11 @@ def timeArg(text):
         return parseTime(text)
     except ValueError:
         raise argparse.ArgumentTypeError(f'{text} is not a valid time, use HHMM 24 Hours')
+
+
+
+
+    
 def viewEvent(eventNum):
     print('Record',eventNum)
     if events[eventNum]['mod']:
@@ -338,7 +375,7 @@ def runCommand(args):
             eventFreq = args.repeat.upper()
         else:
             eventFreq = None
-        addEvent(args.desc,args.date,args.time,args.mod,eventFreq)
+        addEvent(args.desc,args.date,args.time,args.mod,eventFreq,None)
         print('Event added successfully')
     elif args.command == 'edit':
         editEvent(args.id,args.field,args.value)
