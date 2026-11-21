@@ -14,7 +14,7 @@ import keyring
 
 
 DATA_DIR = Path(__file__).parent
-EVENTS_FILE = DATA_DIR / 'localEvents.json'
+EVENTS_FILE = DATA_DIR / 'events.json'
 DELETED_FILE = DATA_DIR / 'deleted_events.json'
 
 SERVICE_NAME = 'remindme'
@@ -277,7 +277,7 @@ def syncEvents():
                 if eventUID in globalUIDs and needsUpdating == False:
                     print('event already in')
                 elif eventUID in globalUIDs and needsUpdating:
-                    syncUpdates(start,title,eventUID)
+                    syncUpdates(start,title,eventUID,globalUIDs)
                     detail['needsUpdating'] = False
                 else:
                     if detail['syncedPrev'] == False:
@@ -286,7 +286,7 @@ def syncEvents():
                         detail['syncedPrev'] = True
                         print("event added")
                     else:
-                        print('Conflict between global and local, local event deleted to match global')
+                        print('Event in iCloud deleted, local event deleted to match global')
                         localQueue.append(id)
                 localUIDs.add(eventUID)
             for id in localQueue:
@@ -299,7 +299,7 @@ def syncEvents():
                     start = comp['dtstart'].dt
                     if isinstance(start, datetime.datetime):
                         start = start.astimezone(ZoneInfo("Europe/London"))
-                        addEvent(title,start.date(),start.strftime('%H%M'),'',None,uid)
+                        addEvent(title,start.date(),start.strftime('%H%M'),'',None,uid,True)
 
 
                 
