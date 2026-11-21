@@ -10,6 +10,7 @@ import sys
 from caldav.lib.error import AuthorizationError
 from pathlib import Path
 import keyring
+from caldav.elements import dav
 
 
 
@@ -195,7 +196,7 @@ def syncUpdates(start,title,UID,array):
 
 def syncCreate(freq,start,title,eventUID,calendar):
     if freq is None:
-        calendar.add_event(
+        return calendar.add_event(
             dtstart=start,
             dtend=start + datetime.timedelta(minutes=30),
             summary=title,
@@ -205,7 +206,7 @@ def syncCreate(freq,start,title,eventUID,calendar):
             alarm_description=title
         )
     else:
-        calendar.add_event(
+        return calendar.add_event(
             dtstart=start,
             dtend=start + datetime.timedelta(minutes=30),
             summary=title,
@@ -273,6 +274,12 @@ def syncEvents():
                     detail['uid'] = str(uuid.uuid4())
                     eventUID = detail.get('uid')
                     saveEvents()
+                if eventUID in globalUIDs:
+                    localEtag = detail['etag']
+                    globalEtag = globalUIDs[eventUID].get_property(dav.GetEtag())
+                    if localEtag != globalEtag:
+                        #finish    
+
 
                 if eventUID in globalUIDs and needsUpdating == False:
                     print('event already in')
@@ -281,9 +288,10 @@ def syncEvents():
                     detail['needsUpdating'] = False
                 else:
                     if detail['syncedPrev'] == False:
-                        syncCreate(eventFreq,start,title,eventUID,calendar)
+                        newEvent = syncCreate(eventFreq,start,title,eventUID,calendar)
                         detail['needsUpdating'] = False
                         detail['syncedPrev'] = True
+                        detail['etag'] = newEvent.get_property(dav.GetEtag())
                         print("event added")
                     else:
                         print('Event in iCloud deleted, local event deleted to match global')
