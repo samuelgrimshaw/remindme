@@ -14,7 +14,7 @@ import keyring
 
 
 DATA_DIR = Path(__file__).parent
-EVENTS_FILE = DATA_DIR / 'events.json'
+EVENTS_FILE = DATA_DIR / 'localEvents.json'
 DELETED_FILE = DATA_DIR / 'deleted_events.json'
 
 SERVICE_NAME = 'remindme'
@@ -29,12 +29,12 @@ def loadJson(path,default):
         return default
 rawevents = loadJson(EVENTS_FILE,{})
 pendingDeletes = loadJson(DELETED_FILE,[])
-events = {}
+localEvents = {}
 
 for eventId, details in rawevents.items():
     details['date'] = datetime.date.fromisoformat(details['date'])
-    events[int(eventId)] = details
-eventNum = max(events, default=0) + 1
+    localEvents[int(eventId)] = details
+eventNum = max(localEvents, default=0) + 1
 
 
 
@@ -58,11 +58,11 @@ def makeAlarm(title,minutesBefore=60):
 
 
 
-#EVENTS
+#localEvents
 
 def saveEvents():
     eventsToSave = {}
-    for eventId, details in events.items():
+    for eventId, details in localEvents.items():
         savedDetails = details.copy()
         savedDetails['date'] = details['date'].isoformat()
         eventsToSave[eventId] = savedDetails
@@ -74,11 +74,11 @@ def saveEvents():
 
     
 
-def addEvent(desc,date,time,mod,freq,uid=None):
+def addEvent(desc,date,time,mod,freq,uid=None,syncedPrev=False):
     global eventNum
 
     
-    events[eventNum] = {
+    localEvents[eventNum] = {
         'type':'R' if freq else 'O',
         'freq':freq,
         'date':date,
@@ -86,7 +86,8 @@ def addEvent(desc,date,time,mod,freq,uid=None):
         'mod':mod,
         'desc':desc,
         'uid': uid if uid else str(uuid.uuid4()),
-        'needsUpdating' : False
+        'needsUpdating' : False,
+        'syncedPrev' : syncedPrev
     }
     eventNum += 1
 
@@ -96,7 +97,7 @@ def viewUpcomingEvent():
     week = []
     month = []
     year = []
-    for eventNum, details in sorted(events.items(), key=lambda item: item[1]['date']):
+    for eventNum, details in sorted(localEvents.items(), key=lambda item: item[1]['date']):
         eventDate = details['date']
         diff = (eventDate - currentDate).days
         if 0 <= diff <= 7:
@@ -125,7 +126,7 @@ def viewUpcomingEvent():
 
 
 def deleteEvent(id):
-    removedEvent = events.pop(id,None)
+    removedEvent = localEvents.pop(id,None)
     if removedEvent is None:
         print('Event not found')
         return
@@ -136,7 +137,7 @@ def deleteEvent(id):
     
 
 def editEvent(id,field,value):
-    if id not in events:
+    if id not in localEvents:
         sys.exit('Invalid record number')
     if field == 'date':
         try:
@@ -148,8 +149,8 @@ def editEvent(id,field,value):
             value = parseTime(value)
         except ValueError:
             sys.exit(f'{value} is an invalid time')
-    events[id][field] = value
-    events[id]['needsUpdating'] = True
+    localEvents[id][field] = value
+    localEvents[id]['needsUpdating'] = True
     saveEvents()
     print("Event edited.")
 
@@ -243,22 +244,24 @@ def syncEvents():
             keyring.set_password(SERVICE_NAME,email,password)
 
             # create existing array
-            existing = {}
+            globalUIDs = {}
             for event in currentEvents:
-                existing[str(event.get_icalendar_component()['UID'])] = event
+                globalUIDs[str(event.get_icalendar_component()['UID'])] = event
 
-            # deleted events
-            syncDeletes(pendingDeletes,existing)
+            # deleted localEvents
+            syncDeletes(pendingDeletes,globalUIDs)
 
             localUIDs = set()
 
-            for id,detail in events.items():
+            localQueue = []
+
+            for id,detail in localEvents.items():
                 title = detail['desc']
                 startTime = datetime.datetime.strptime(detail['time'], "%H%M").time()
 
                 start = datetime.datetime.combine(detail['date'],startTime,tzinfo=ZoneInfo("Europe/London"))
 
-                freq = detail['freq']
+                eventFreq = detail['freq']
 
 
 
@@ -271,27 +274,33 @@ def syncEvents():
                     eventUID = detail.get('uid')
                     saveEvents()
 
-                if eventUID in existing and needsUpdating == False:
+                if eventUID in globalUIDs and needsUpdating == False:
                     print('event already in')
-                elif eventUID in existing and needsUpdating:
-                    syncUpdates(start,title,eventUID,existing)
+                elif eventUID in globalUIDs and needsUpdating:
+                    syncUpdates(start,title,eventUID)
                     detail['needsUpdating'] = False
                 else:
-                    syncCreate(freq,start,title,eventUID,calendar)
-                    detail['needsUpdating'] = False
-                    print("event added")
-
-
+                    if detail['syncedPrev'] == False:
+                        syncCreate(eventFreq,start,title,eventUID,calendar)
+                        detail['needsUpdating'] = False
+                        detail['syncedPrev'] = True
+                        print("event added")
+                    else:
+                        print('Conflict between global and local, local event deleted to match global')
+                        localQueue.append(id)
                 localUIDs.add(eventUID)
+            for id in localQueue:
+                localEvents.pop(id)
             
-            for uid in existing:
+            for uid in globalUIDs:
                 if uid not in localUIDs:
-                    comp = existing[uid].icalendar_component
+                    comp = globalUIDs[uid].icalendar_component
                     title = str(comp.get('summary',''))
                     start = comp['dtstart'].dt
                     if isinstance(start, datetime.datetime):
                         start = start.astimezone(ZoneInfo("Europe/London"))
                         addEvent(title,start.date(),start.strftime('%H%M'),'',None,uid)
+
 
                 
 
@@ -326,26 +335,26 @@ def timeArg(text):
     
 def viewEvent(eventNum):
     print('Record',eventNum)
-    if events[eventNum]['mod']:
-        print("Module: ",events[eventNum]['mod'])
-    print("Date: ", events[eventNum]['date'].strftime("%d %B %Y"))
-    print('Time: ',datetime.datetime.strptime(events[eventNum]['time'],'%H%M').strftime('%H:%M'))  
-    print("Description: ",events[eventNum]['desc'])
+    if localEvents[eventNum]['mod']:
+        print("Module: ",localEvents[eventNum]['mod'])
+    print("Date: ", localEvents[eventNum]['date'].strftime("%d %B %Y"))
+    print('Time: ',datetime.datetime.strptime(localEvents[eventNum]['time'],'%H%M').strftime('%H:%M'))  
+    print("Description: ",localEvents[eventNum]['desc'])
     print()
 
 def viewAllEvents():
-    if not events:
-        print('No events created')
+    if not localEvents:
+        print('No localEvents created')
         return
     print("--------")
-    for eventNum, _ in sorted(events.items(), key=lambda item: item[1]['date']):
+    for eventNum, _ in sorted(localEvents.items(), key=lambda item: item[1]['date']):
         viewEvent(eventNum)
     print("--------")
 
 
 
 def buildParser():
-    parser = argparse.ArgumentParser(description = 'Manage events and sync them to iCloud calendar. --help for help')
+    parser = argparse.ArgumentParser(description = 'Manage localEvents and sync them to iCloud calendar. --help for help')
     commands = parser.add_subparsers(dest='command')
 
     add = commands.add_parser('add', help='Add a new event')
@@ -355,8 +364,8 @@ def buildParser():
     add.add_argument('--mod',help='Module (if applicable)',default='')
     add.add_argument('--repeat',help='How often?',choices=['daily','weekly','monthly'])
 
-    commands.add_parser('list', help='Show all events')
-    commands.add_parser('upcoming',help='View upcoming events')
+    commands.add_parser('list', help='Show all localEvents')
+    commands.add_parser('upcoming',help='View upcoming localEvents')
 
     delete = commands.add_parser('delete',help='Delete an event')
     delete.add_argument('id',type=int,help='record number')
@@ -366,7 +375,7 @@ def buildParser():
     edit.add_argument('field',choices=['date','time','mod','desc'])
     edit.add_argument('value',help='New value')
 
-    commands.add_parser('sync', help='sync events to iCloud')
+    commands.add_parser('sync', help='sync localEvents to iCloud')
     return parser
 
 def runCommand(args):
